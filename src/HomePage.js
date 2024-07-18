@@ -1,16 +1,49 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getPosts, getPostsByUsername, uploadPost } from './api';
-import { useState } from 'react';
+import { useState } from "react";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
+import { getPosts, uploadPost, getUserInfo } from "./api";
+
+const PAGE_LIMIT = 3;
 
 function HomePage() {
-  const [content, setContent] = useState("");
-
   const queryClient = useQueryClient();
+  const [content, setContent] = useState("");
+  const [currentUsername, setCurrentUsername] = useState("");
+  const [page, setPage] = useState(0);
+  const {
+    data: postsData,
+    isPending,
+    isError,
+    isPlaceholderData,
+  } = useQuery({
+    queryKey: ["posts", page],
+    queryFn: () => getPosts(page, PAGE_LIMIT),
+    placeholderData: keepPreviousData,
+    retry: 0,
+  });
+
+  const { data: userInfoData, isPending: isUserInfoPending } = useQuery({
+    queryKey: ["userInfo"],
+    queryFn: () => getUserInfo(currentUsername),
+    enabled: !!currentUsername,
+  });
 
   const uploadPostMutation = useMutation({
-    mutationFn: (newPost) => uploadPost(newPost),
+    mutationFn: (newPost) =>
+      uploadPost(newPost, {
+        onSuccess: () => {
+          console.log("onSuccess in mutate");
+        },
+        onSettled: () => {
+          console.log("onSettled in mutate");
+        },
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
       console.log("onSuccess in useMutation");
     },
     onSettled: () => {
@@ -20,67 +53,44 @@ function HomePage() {
 
   const handleInputChange = (e) => {
     setContent(e.target.value);
-  }
+  };
+
+  const handleLoginButtonClick = () => {
+    setCurrentUsername("codeit");
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const newPost = { username: 'codeit', content };
-    uploadPostMutation.mutate(newPost, {
-      onSuccess: () => {
-        console.log('onSuccess in mutate');
-      },
-      onSettled: () => {
-        console.log('onSettled in mutate');
-      },
-    });
-    setContent('');
-  }
-  // const result = useQuery({ queryKey: ['posts'], queryFn: getPosts });
-  // console.log(result);
+    const newPost = { username: "codeit", content };
+    uploadPostMutation.mutate(newPost);
+    setContent("");
+  };
 
-  // const username = 'codeit';
-  // const { data: postDataByUsername } = useQuery({
-  //   queryKey: ['posts', username, { status: 'private' }],
-  //   queryFn: () => getPostsByUsername(username),
-  //   // queryFn: ({ queryKey }) => getPostsByUserId(queryKey[1]), 
-  // });
-  // console.log(postDataByUsername);
+  const loginMessage = isUserInfoPending
+    ? "로그인 중입니다..."
+    : `${userInfoData?.name}님 환영합니다!`;
 
-  // const { error, isError } = useQuery({
-  //   queryKey: ['posts'],
-  //   queryFn: async (key) => {
-  //     throw new Error('An error occurred!');
-  //   },
-  // })
-  // console.log(error); // null 반환
-  // console.log(isError); // false 반환
+  if (isPending) return "로딩 중입니다...";
 
-
-  const { data: postsData, isPending, isError } = useQuery({
-    queryKey: ['posts'],
-    queryFn: getPosts,
-    retry: 0,
-  });
-
-  if (isPending) return '로딩 중입니다...';
-  if (isError) return '에러가 발생했습니다.';
+  if (isError) return "에러가 발생했습니다.";
 
   const posts = postsData?.results ?? [];
-  queryClient.invalidateQueries();
 
   return (
     <>
       <div>
+        {currentUsername ? (
+          loginMessage
+        ) : (
+          <button onClick={handleLoginButtonClick}>codeit으로 로그인</button>
+        )}
         <form onSubmit={handleSubmit}>
           <textarea
-            name='content'
+            name="content"
             value={content}
             onChange={handleInputChange}
           />
-          <button
-            disabled={uploadPostMutation.isPending || !content}
-            type='submit'
-          >
+          <button disabled={!content} type="submit">
             업로드
           </button>
         </form>
@@ -93,6 +103,20 @@ function HomePage() {
             </li>
           ))}
         </ul>
+        <div>
+          <button
+            disabled={page === 0}
+            onClick={() => setPage((old) => Math.max(old - 1, 0))}
+          >
+            &lt;
+          </button>
+          <button
+            disabled={isPlaceholderData || !postsData?.hasMore}
+            onClick={() => setPage((old) => old + 1)}
+          >
+            &gt;
+          </button>
+        </div>
       </div>
     </>
   );
