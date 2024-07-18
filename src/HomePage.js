@@ -1,9 +1,11 @@
+import Post from "./Post";
 import { useState } from "react";
 import {
   useMutation,
   useQuery,
   useQueryClient,
   keepPreviousData,
+  useInfiniteQuery,
 } from "@tanstack/react-query";
 import { getPosts, uploadPost, getUserInfo } from "./api";
 
@@ -14,15 +16,34 @@ function HomePage() {
   const [content, setContent] = useState("");
   const [currentUsername, setCurrentUsername] = useState("");
   const [page, setPage] = useState(0);
+
+  // Paginated Query
+  // const {
+  //   data: postsData,
+  //   isPending,
+  //   isError,
+  //   isPlaceholderData,
+  // } = useQuery({
+  //   queryKey: ["posts", page],
+  //   queryFn: () => getPosts(page, PAGE_LIMIT),
+  //   placeholderData: keepPreviousData,
+  //   retry: 0,
+  // });
+
+  // Infinite Query
   const {
     data: postsData,
     isPending,
     isError,
-    isPlaceholderData,
-  } = useQuery({
-    queryKey: ["posts", page],
-    queryFn: () => getPosts(page, PAGE_LIMIT),
-    placeholderData: keepPreviousData,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["posts"],
+    queryFn: ({ pageParam }) => getPosts(pageParam, PAGE_LIMIT),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages, lastPageParam, allPageParams) =>
+      lastPage.hasMore ? lastPageParam + 1 : undefined,
     retry: 0,
   });
 
@@ -76,6 +97,8 @@ function HomePage() {
 
   const posts = postsData?.results ?? [];
 
+  const postsPages = postsData?.pages ?? [];
+
   return (
     <>
       <div>
@@ -96,15 +119,26 @@ function HomePage() {
         </form>
       </div>
       <div>
-        <ul>
+        {/* <ul>
           {posts.map((post) => (
             <li key={post.id}>
               {post.user.name}: {post.content}
             </li>
           ))}
+        </ul> */}
+        <ul>
+          {postsPages.map((postPage) =>
+            postPage.results.map((post) => (
+              <Post
+                key={post.id}
+                post={post}
+                currentUsername={currentUsername}
+              />
+            ))
+          )}
         </ul>
         <div>
-          <button
+          {/* <button
             disabled={page === 0}
             onClick={() => setPage((old) => Math.max(old - 1, 0))}
           >
@@ -115,6 +149,12 @@ function HomePage() {
             onClick={() => setPage((old) => old + 1)}
           >
             &gt;
+          </button> */}
+          <button
+            onClick={fetchNextPage}
+            disabled={!hasNextPage || isFetchingNextPage}
+          >
+            더 불러오기
           </button>
         </div>
       </div>

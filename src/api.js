@@ -35,3 +35,49 @@ export async function getUserInfo(username) {
   const response = await fetch(`${BASE_URL}/users/${username}`);
   return await response.json();
 }
+
+// 포스트의 좋아요 데이터를 받아오는 함수
+export async function getLikeCountByPostId(postId) {
+  const response = await fetch(`${BASE_URL}/posts/${postId}/likes`);
+  const body = await response.json();
+  return body.count;
+}
+
+export async function getLikeStatusByUsername(postId, username) {
+  const response = await fetch(`${BASE_URL}/posts/${postId}/likes/${username}`);
+  if (response.status === 200) {
+    return true;
+  } else if (response.status === 404) {
+    return false;
+  } else {
+    throw new Error("Failed to get like status of the post.");
+  }
+}
+
+// 좋아요 실행 함수
+export async function likePost(postId, username) {
+  const response = await fetch(
+    `${BASE_URL}/posts/${postId}/likes/${username}`,
+    {
+      method: "POST",
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to like the post.");
+  }
+}
+
+// 좋아요 취소 함수
+export async function unlikePost(postId, username) {
+  const response = await fetch(
+    `${BASE_URL}/posts/${postId}/likes/${username}`,
+    {
+      method: "DELETE",
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to unlike the post.");
+  }
+}
